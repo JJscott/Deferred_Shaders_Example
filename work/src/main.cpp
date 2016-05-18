@@ -70,9 +70,10 @@ GLuint g_deferred_shader;
 
 // Lights
 struct Light {
-	vec3 pos_v;
+	// @josh what made you think it made sense to store this directly in view space?
+	vec3 pos_w;
 	vec3 flux;
-	Light(vec3 p, vec3 f) : pos_v(p), flux(f) {}
+	Light(vec3 p, vec3 f) : pos_w(p), flux(f) {}
 };
 
 vector<Light> g_lights;
@@ -148,8 +149,8 @@ void initShader() {
 
 
 void initLights() {
-	for (int i=0; i<64; ++i) {
-		g_lights.push_back(Light(vec3::random(-5, 5), normalize(vec3::random(0, 1))));
+	for (int i = 0; i < 32; ++i) {
+		g_lights.push_back(Light(vec3::random(-5, 5) + vec3(0, 5, 0), 20 * normalize(vec3::random(0.0, 1))));
 	}
 }
 
@@ -276,15 +277,18 @@ void renderSceneBuffer(int width, int height) {
 	//
 	glUniform1f(glGetUniformLocation(g_scene_shader, "uZFar"), g_zfar);
 
+	vec3 gold_spec_chroma { 0.9f, 0.8f, 0.6f };
+	vec3 silver_spec_chroma { 0.8f };
+
 	vec3 red(1.0, 0, 0);
-	glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, red.dataPointer());
-	glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, red.dataPointer());
+	glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, (pow(gold_spec_chroma, vec3(2)) * 0.3f).dataPointer());
+	glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, (gold_spec_chroma * 0.6f).dataPointer());
 	cgraSphere(2.0);
 
 
 	vec3 grey(0.8, 0.8, 0.8);
-	glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, grey.dataPointer());
-	glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, grey.dataPointer());
+	glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, (pow(silver_spec_chroma, vec3(2)) * 0.3f).dataPointer());
+	glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, (silver_spec_chroma * 0.6f).dataPointer());
 
 	glPushMatrix();
 
@@ -322,9 +326,9 @@ void renderSceneBuffer(int width, int height) {
 	//Draw Lights
 	for (const Light &l : g_lights) {
 		glPushMatrix();
-			glTranslatef(l.pos_v.x, l.pos_v.y, l.pos_v.z);
-			glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, l.flux.dataPointer());
-			glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, l.flux.dataPointer());
+			glTranslatef(l.pos_w.x, l.pos_w.y, l.pos_w.z);
+			glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, vec3(1).dataPointer());
+			glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, vec3(0).dataPointer());
 			cgraSphere(0.1);
 		glPopMatrix();
 	}
@@ -374,18 +378,34 @@ void renderDeferred(int width, int height) {
 	glUniform1i(glGetUniformLocation(g_deferred_shader, "uDiffuse"), 2);
 	glUniform1i(glGetUniformLocation(g_deferred_shader, "uSpecular"), 3);
 
+	glUniform1i(glGetUniformLocation(g_deferred_shader, "uNumLights"), GLuint(g_lights.size()));
 
+	mat4 proj;
+	glGetFloatv(GL_PROJECTION_MATRIX, proj.dataPointer());
+
+	// pick a z for unprojection (nearly arbitrary)
+	vec4 unproj = proj * vec4(0, 0, -g_znear * 10, 1);
+	glUniform1f(glGetUniformLocation(g_deferred_shader, "uZUnproject"), unproj.z / unproj.w);
+
+	// hope modelview is just the view matrix
+	mat4 view;
+	glGetFloatv(GL_MODELVIEW_MATRIX, view.dataPointer());
 
 	// Upload lights
-	for (int i = 0; i < 64; ++i) {
+	// hooray for (in)efficiency!
+	for (size_t i = 0; i < g_lights.size(); ++i) {
+
+		// @josh two things:
+		// 1 - use the right shader
+		// 2 - it doesn't help if you overwrite the position with the flux
 
 		ostringstream ss;
 		ss << "uLights[" << i << "].pos_v";
-		glUniform3fv(glGetUniformLocation(g_scene_shader, ss.str().c_str()), 1, g_lights[i].pos_v.dataPointer());
+		glUniform3fv(glGetUniformLocation(g_deferred_shader, ss.str().c_str()), 1, (view * vec4(g_lights[i].pos_w, 1)).dataPointer());
 		
 		ss = ostringstream();
-		ss << "uLights[" << i << "].pos_v";
-		glUniform3fv(glGetUniformLocation(g_scene_shader, ss.str().c_str()), 1, g_lights[i].flux.dataPointer());
+		ss << "uLights[" << i << "].flux";
+		glUniform3fv(glGetUniformLocation(g_deferred_shader, ss.str().c_str()), 1, g_lights[i].flux.dataPointer());
 	}
 
 
@@ -426,6 +446,10 @@ int main(int argc, char **argv) {
 	// Get the version for GLFW for later
 	int glfwMajor, glfwMinor, glfwRevision;
 	glfwGetVersion(&glfwMajor, &glfwMinor, &glfwRevision);
+
+#ifndef NDEBUG
+	glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, true);
+#endif
 
 	// Create a windowed mode window and its OpenGL context
 	g_window = glfwCreateWindow(640, 480, "Hello World", nullptr, nullptr);
@@ -573,7 +597,7 @@ string getStringForType(GLenum type) {
 
 // actually define the function
 void APIENTRY debugCallbackARB(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei, const GLchar* message, GLvoid*) {
-	if (severity != GL_DEBUG_SEVERITY_NOTIFICATION) return;
+	if (severity == GL_DEBUG_SEVERITY_NOTIFICATION) return;
 
 	cerr << endl; // extra space
 
@@ -584,5 +608,5 @@ void APIENTRY debugCallbackARB(GLenum source, GLenum type, GLuint id, GLenum sev
 
 	cerr << message << endl;
 
-	if (type == GL_DEBUG_TYPE_ERROR_ARB) throw runtime_error("");
+	if (type == GL_DEBUG_TYPE_ERROR) throw runtime_error(message);
 }

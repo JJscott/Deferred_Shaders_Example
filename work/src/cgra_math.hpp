@@ -2823,6 +2823,10 @@ namespace cgra {
 
 	template <typename T>
 	class matrix4 {
+		// @josh this needs to go in _all_ the classes for things like mat4(dmat4(...)) to work
+		// otherwise, 'data' is private to matrix4<U> and can't be seen from matrix4<T>
+		template <typename> friend class matrix4;
+
 	private:
 		vector4<T> data[4];
 
