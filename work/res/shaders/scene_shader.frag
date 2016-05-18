@@ -5,7 +5,7 @@ uniform float uZFar;
 uniform vec3 uDiffuse;
 uniform vec3 uSpecular;
 
-varying vec3 vPostion;
+varying vec3 vPosition;
 varying vec3 vNormal;
 
 // depth_v should be +ve
@@ -17,7 +17,7 @@ void write_depth(float depth_v) {
 }
 
 void main() {
-	write_depth(-vPostion.z);
+	write_depth(-vPosition.z);
 	gl_FragData[0].rgb = normalize(vNormal);
 	gl_FragData[1].rgb = uDiffuse;
 	gl_FragData[2].rgb = uSpecular;

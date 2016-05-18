@@ -7,6 +7,15 @@ uniform sampler2D uNormal;
 uniform sampler2D uDiffuse;
 uniform sampler2D uSpecular;
 
+
+struct Light {
+	vec3 pos_v; // Viewspace position
+	vec3 flux;
+};
+
+uniform Light[64] uLights;
+
+
 varying vec2 vTextureCoord;
 
 // also +ve
@@ -37,5 +46,17 @@ void main() {
 	vec3 specular = texture2D(uSpecular, vTextureCoord).rgb;
 
 
-	gl_FragColor = vec4(norm_v.z * diffuse, 1.0);
+	vec3 color = vec3(0, 0, 0);
+	for (int i = 0; i < 64; ++i) {
+	// 	// float d = 1/distance(pos_v, uLights[i].pos_v);
+	// 	// if (d == d){
+			color += uLights[i].flux * diffuse;
+	// 	// }
+	}
+	gl_FragColor = vec4(color, 1.0);
+
+	//ugh
+	// gl_FragColor = vec4((0.8*norm_v.z + 0.2) * diffuse, 1.0);
+	// gl_FragColor = vec4(diffuse, 1.0);
+	// gl_FragColor = vec4(abs(norm_v), 1.0);
 }

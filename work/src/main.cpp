@@ -16,6 +16,7 @@
 #include <cstdlib>
 #include <chrono>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <stdexcept>
 #include <vector>
@@ -36,9 +37,9 @@ GLFWwindow* g_window;
 
 // Projection values
 // 
-float g_fovy = 20.0;
+float g_fovy = 60.0;
 float g_znear = 0.1;
-float g_zfar = 1000.0;
+float g_zfar = 20000000.0;
 
 
 // Mouse controlled Camera values
@@ -66,6 +67,15 @@ GLuint g_scene_texture_shader;
 
 GLuint g_deferred_shader;
 
+
+// Lights
+struct Light {
+	vec3 pos_v;
+	vec3 flux;
+	Light(vec3 p, vec3 f) : pos_v(p), flux(f) {}
+};
+
+vector<Light> g_lights;
 
 
 
@@ -136,6 +146,14 @@ void initShader() {
 }
 
 
+
+void initLights() {
+	for (int i=0; i<64; ++i) {
+		g_lights.push_back(Light(vec3::random(-5, 5), normalize(vec3::random(0, 1))));
+	}
+}
+
+
 // Sets up where the camera is in the scene
 // 
 void setupCamera(int width, int height) {
@@ -148,7 +166,7 @@ void setupCamera(int width, int height) {
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 
-	glTranslatef(0, 0, -50 * g_zoom);
+	glTranslatef(0, 0, -10 * g_zoom);
 	glRotatef(g_pitch, 1, 0, 0);
 	glRotatef(g_yaw, 0, 1, 0);
 }
@@ -237,6 +255,8 @@ void ensureFBO(int w, int h) {
 //
 void renderSceneBuffer(int width, int height) {
 	ensureFBO(width, height);
+	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, g_fbo_scene);
+	glViewport(0, 0, width, height);
 
 	// Clear all scene buffers to 0
 	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
@@ -253,33 +273,61 @@ void renderSceneBuffer(int width, int height) {
 	glUseProgram(g_scene_shader);
 
 	// Render scene 
-	// 
+	//
+	glUniform1f(glGetUniformLocation(g_scene_shader, "uZFar"), g_zfar);
 
 	vec3 red(1.0, 0, 0);
 	glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, red.dataPointer());
 	glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, red.dataPointer());
-	// cgraCylinder(2.0, 1.0, 1.0);
 	cgraSphere(2.0);
 
-	mat4 mv;
-	glGetFloatv(GL_MODELVIEW_MATRIX, mv.dataPointer());
-	cout << mv << endl;
+
+	vec3 grey(0.8, 0.8, 0.8);
+	glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, grey.dataPointer());
+	glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, grey.dataPointer());
+
+	glPushMatrix();
+
+		glTranslatef(0,-1,0);
+
+		glBegin(GL_TRIANGLES);
+		glNormal3f(0, 1.0, 0);
+		glVertex3f(-10.0, 0, -10.0);
+		glVertex3f(10.0, 0, -10.0);
+		glVertex3f(-10.0, 0, 10.0);
+		glVertex3f(10.0, 0, -10.0);
+		glVertex3f(10.0, 0, 10.0);
+		glVertex3f(-10.0, 0, 10.0);
+		glEnd();
+		glFlush();
+
+	glPopMatrix();
 
 
-	// vec3 grey(0.8, 0.8, 0.8);
-	// glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, grey.dataPointer());
-	// glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, grey.dataPointer());
+	// Big ass spehre
+	glPushMatrix();
+		vec3 earth(0.3, 0.3, 0.6);
+		glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, earth.dataPointer());
+		glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, earth.dataPointer());
+		glTranslatef(0, 0, -10000000);
+		cgraSphere(6371000);
 
-	// glBegin(GL_TRIANGLES);
-	// glNormal3f(0, 1.0, 0);
-	// glVertex3f(-10.0, 0, -10.0);
-	// glVertex3f(10.0, 0, -10.0);
-	// glVertex3f(-10.0, 0, 10.0);
-	// glVertex3f(10.0, 0, -10.0);
-	// glVertex3f(10.0, 0, 10.0);
-	// glVertex3f(-10.0, 0, 10.0);
-	// glEnd();
-	// glFlush();
+		glTranslatef(0,0, 6371000);
+		glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, grey.dataPointer());
+		glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, grey.dataPointer());
+		cgraSphere(1737000);
+	glPopMatrix();
+
+
+	//Draw Lights
+	for (const Light &l : g_lights) {
+		glPushMatrix();
+			glTranslatef(l.pos_v.x, l.pos_v.y, l.pos_v.z);
+			glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, l.flux.dataPointer());
+			glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, l.flux.dataPointer());
+			cgraSphere(0.1);
+		glPopMatrix();
+	}
 
 
 	glUseProgram(0);
@@ -303,8 +351,6 @@ void renderDeferred(int width, int height) {
 	// Use the deferred shading program
 	glUseProgram(g_deferred_shader);
 
-
-	glEnable(GL_TEXTURE_2D);
 	glDisable(GL_DEPTH_TEST);
 
 	// Upload the far plane
@@ -327,6 +373,20 @@ void renderDeferred(int width, int height) {
 	glUniform1i(glGetUniformLocation(g_deferred_shader, "uNormal"), 1);
 	glUniform1i(glGetUniformLocation(g_deferred_shader, "uDiffuse"), 2);
 	glUniform1i(glGetUniformLocation(g_deferred_shader, "uSpecular"), 3);
+
+
+
+	// Upload lights
+	for (int i = 0; i < 64; ++i) {
+
+		ostringstream ss;
+		ss << "uLights[" << i << "].pos_v";
+		glUniform3fv(glGetUniformLocation(g_scene_shader, ss.str().c_str()), 1, g_lights[i].pos_v.dataPointer());
+		
+		ss = ostringstream();
+		ss << "uLights[" << i << "].pos_v";
+		glUniform3fv(glGetUniformLocation(g_scene_shader, ss.str().c_str()), 1, g_lights[i].flux.dataPointer());
+	}
 
 
 	// Draw a triangle that covers the screen
@@ -422,6 +482,7 @@ int main(int argc, char **argv) {
 
 
 	// Initialize Geometry/Material/Lights
+	initLights();
 	initShader();
 
 	// Loop until the user closes the window
