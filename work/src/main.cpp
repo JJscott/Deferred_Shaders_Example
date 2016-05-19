@@ -39,7 +39,8 @@ GLFWwindow* g_window;
 // 
 float g_fovy = 60.0;
 float g_znear = 0.1;
-float g_zfar = 20000000.0;
+// float g_zfar = 20000000.0;
+float g_zfar = 200.0;
 
 
 // Mouse controlled Camera values
@@ -66,6 +67,8 @@ GLuint g_scene_shader;
 GLuint g_scene_texture_shader;
 
 GLuint g_deferred_shader;
+
+float g_exposure = 15.0;
 
 
 // Lights
@@ -119,6 +122,16 @@ void scrollCallback(GLFWwindow *win, double xoffset, double yoffset) {
 void keyCallback(GLFWwindow *win, int key, int scancode, int action, int mods) {
 	// cout << "Key Callback :: key=" << key << "scancode=" << scancode
 	// 	<< "action=" << action << "mods=" << mods << endl;
+	if (action == GLFW_PRESS) {
+		switch(key) {
+		case GLFW_KEY_UP:
+			g_exposure += 1;
+			break;
+		case GLFW_KEY_DOWN:
+			g_exposure -= 1;
+			break;
+		}
+	}
 }
 
 
@@ -149,8 +162,10 @@ void initShader() {
 
 
 void initLights() {
-	for (int i = 0; i < 32; ++i) {
-		g_lights.push_back(Light(vec3::random(-5, 5) + vec3(0, 5, 0), 20 * normalize(vec3::random(0.0, 1))));
+	for (int i = 0; i < 64; ++i) {
+		vec3 position = vec3::random(-20, 20) + vec3(0, 20, 0);
+		vec3 flux = 0.02 * normalize(vec3::random(0, 1));
+		g_lights.push_back(Light(position, flux));
 	}
 }
 
@@ -277,49 +292,50 @@ void renderSceneBuffer(int width, int height) {
 	//
 	glUniform1f(glGetUniformLocation(g_scene_shader, "uZFar"), g_zfar);
 
+
+	// Golden sphere
 	vec3 gold_spec_chroma { 0.9f, 0.8f, 0.6f };
-	vec3 silver_spec_chroma { 0.8f };
+	glUniform1f(glGetUniformLocation(g_scene_shader, "uShininess"), 1.0);
+	glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, (pow(gold_spec_chroma, vec3(2)) * 0.9f).dataPointer());
+	// glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, (pow(gold_spec_chroma, vec3(2))).dataPointer());
+	glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, (gold_spec_chroma * 0.01f).dataPointer());
+	cgraSphere(2.0, 100, 100);
 
-	vec3 red(1.0, 0, 0);
-	glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, (pow(gold_spec_chroma, vec3(2)) * 0.3f).dataPointer());
-	glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, (gold_spec_chroma * 0.6f).dataPointer());
-	cgraSphere(2.0);
 
 
-	vec3 grey(0.8, 0.8, 0.8);
-	glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, (pow(silver_spec_chroma, vec3(2)) * 0.3f).dataPointer());
-	glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, (silver_spec_chroma * 0.6f).dataPointer());
 
+	// Table
 	glPushMatrix();
+		// Silver floor
+		vec3 silver_spec_chroma { 0.8f };
+		glUniform1f(glGetUniformLocation(g_scene_shader, "uShininess"), 300.0);
+		glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, (pow(silver_spec_chroma, vec3(2)) * 0.3f).dataPointer());
+		// glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, (pow(silver_spec_chroma, vec3(2))).dataPointer());
+		glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, (silver_spec_chroma * 0.6f).dataPointer());
 
-		glTranslatef(0,-1,0);
 
+		glTranslatef(0,-2,0);
 		glBegin(GL_TRIANGLES);
 		glNormal3f(0, 1.0, 0);
-		glVertex3f(-10.0, 0, -10.0);
-		glVertex3f(10.0, 0, -10.0);
-		glVertex3f(-10.0, 0, 10.0);
-		glVertex3f(10.0, 0, -10.0);
-		glVertex3f(10.0, 0, 10.0);
-		glVertex3f(-10.0, 0, 10.0);
+		glVertex3f(-20.0, 0, -20.0);
+		glVertex3f( 20.0, 0, -20.0);
+		glVertex3f(-20.0, 0,  20.0);
+		glVertex3f( 20.0, 0, -20.0);
+		glVertex3f( 20.0, 0,  20.0);
+		glVertex3f(-20.0, 0,  20.0);
 		glEnd();
 		glFlush();
-
 	glPopMatrix();
 
 
-	// Big ass spehre
+	// Big grey sphere
 	glPushMatrix();
-		vec3 earth(0.3, 0.3, 0.6);
-		glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, earth.dataPointer());
-		glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, earth.dataPointer());
-		glTranslatef(0, 0, -10000000);
-		cgraSphere(6371000);
-
-		glTranslatef(0,0, 6371000);
+		vec3 grey(0.8, 0.8, 0.8);
+		glTranslatef(0,0, 4000000);
+		glUniform1f(glGetUniformLocation(g_scene_shader, "uShininess"), 1.0);
 		glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, grey.dataPointer());
 		glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, grey.dataPointer());
-		cgraSphere(1737000);
+		cgraSphere(1500000, 100, 100);
 	glPopMatrix();
 
 
@@ -327,6 +343,7 @@ void renderSceneBuffer(int width, int height) {
 	for (const Light &l : g_lights) {
 		glPushMatrix();
 			glTranslatef(l.pos_w.x, l.pos_w.y, l.pos_w.z);
+			glUniform1f(glGetUniformLocation(g_scene_shader, "uShininess"), 1.0);
 			glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, vec3(1).dataPointer());
 			glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, vec3(0).dataPointer());
 			cgraSphere(0.1);
@@ -353,52 +370,61 @@ void renderDeferred(int width, int height) {
 
 
 	// Use the deferred shading program
+	// 
 	glUseProgram(g_deferred_shader);
-
 	glDisable(GL_DEPTH_TEST);
 
+
 	// Upload the far plane
+	// 
 	glUniform1f(glGetUniformLocation(g_deferred_shader, "uZFar"), g_zfar);
 
-	// Upload the scene buffer textures
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, g_tex_scene_depth);
-
-	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_2D, g_tex_scene_normal);
-
-	glActiveTexture(GL_TEXTURE2);
-	glBindTexture(GL_TEXTURE_2D, g_tex_scene_diffuse);
-
-	glActiveTexture(GL_TEXTURE3);
-	glBindTexture(GL_TEXTURE_2D, g_tex_scene_specular);
-
-	glUniform1i(glGetUniformLocation(g_deferred_shader, "uDepth"), 0);
-	glUniform1i(glGetUniformLocation(g_deferred_shader, "uNormal"), 1);
-	glUniform1i(glGetUniformLocation(g_deferred_shader, "uDiffuse"), 2);
-	glUniform1i(glGetUniformLocation(g_deferred_shader, "uSpecular"), 3);
-
-	glUniform1i(glGetUniformLocation(g_deferred_shader, "uNumLights"), GLuint(g_lights.size()));
-
+	// Get the projection matrix to work out the plane to project onto
 	mat4 proj;
 	glGetFloatv(GL_PROJECTION_MATRIX, proj.dataPointer());
-
-	// pick a z for unprojection (nearly arbitrary)
+	// Pick a z for unprojection (nearly arbitrary)
 	vec4 unproj = proj * vec4(0, 0, -g_znear * 10, 1);
 	glUniform1f(glGetUniformLocation(g_deferred_shader, "uZUnproject"), unproj.z / unproj.w);
 
-	// hope modelview is just the view matrix
+
+	// Upload Exposure
+	// 
+	glUniform1f(glGetUniformLocation(g_deferred_shader, "uExposure"), g_exposure);
+
+
+	// Upload the scene buffer textures
+	// 
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, g_tex_scene_depth);
+	glUniform1i(glGetUniformLocation(g_deferred_shader, "uDepth"), 0);
+
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, g_tex_scene_normal);
+	glUniform1i(glGetUniformLocation(g_deferred_shader, "uNormal"), 1);
+
+	glActiveTexture(GL_TEXTURE2);
+	glBindTexture(GL_TEXTURE_2D, g_tex_scene_diffuse);
+	glUniform1i(glGetUniformLocation(g_deferred_shader, "uDiffuse"), 2);
+
+	glActiveTexture(GL_TEXTURE3);
+	glBindTexture(GL_TEXTURE_2D, g_tex_scene_specular);
+	glUniform1i(glGetUniformLocation(g_deferred_shader, "uSpecular"), 3);
+
+
+
+
+
+	// Setup the camera again, so the GL_MODELVIEW_MATRIX contains just the view matrix
+	setupCamera(width, height);
 	mat4 view;
 	glGetFloatv(GL_MODELVIEW_MATRIX, view.dataPointer());
 
 	// Upload lights
-	// hooray for (in)efficiency!
+	// Positions must be in view-space
+	//
+	glUniform1i(glGetUniformLocation(g_deferred_shader, "uNumLights"), GLuint(g_lights.size()));
+
 	for (size_t i = 0; i < g_lights.size(); ++i) {
-
-		// @josh two things:
-		// 1 - use the right shader
-		// 2 - it doesn't help if you overwrite the position with the flux
-
 		ostringstream ss;
 		ss << "uLights[" << i << "].pos_v";
 		glUniform3fv(glGetUniformLocation(g_deferred_shader, ss.str().c_str()), 1, (view * vec4(g_lights[i].pos_w, 1)).dataPointer());

@@ -2,6 +2,7 @@
 
 uniform vec3 uDiffuse;
 uniform vec3 uSpecular;
+uniform float uShininess;
 
 varying vec3 vPosition;
 varying vec3 vNormal;
