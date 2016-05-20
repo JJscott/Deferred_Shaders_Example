@@ -84,7 +84,7 @@ vector<Light> g_lights;
 
 // Controllable variables
 float g_exposure = 15.0;
-bool g_permute_lights = true;
+bool g_permute_lights = false;
 
 
 
@@ -314,10 +314,10 @@ void renderSceneBuffer(int width, int height) {
 
 	// Golden sphere
 	vec3 gold_spec_chroma { 0.9f, 0.8f, 0.6f };
-	glUniform1f(glGetUniformLocation(g_scene_shader, "uShininess"), 300.0);
-	glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, (pow(gold_spec_chroma, vec3(2)) * 0.9f).dataPointer());
+	glUniform1f(glGetUniformLocation(g_scene_shader, "uShininess"), 500.0);
+	glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, (pow(gold_spec_chroma, vec3(2)) * 0.1f).dataPointer());
 	// glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, (pow(gold_spec_chroma, vec3(2))).dataPointer());
-	glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, (gold_spec_chroma * 0.01f).dataPointer());
+	glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, (gold_spec_chroma * 0.9f).dataPointer());
 	cgraSphere(2.0, 100, 100);
 
 

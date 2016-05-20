@@ -265,7 +265,7 @@ namespace cgra {
 			io.SetClipboardTextFn = setClipboardText;
 			io.GetClipboardTextFn = getClipboardText;
 		#ifdef _WIN32
-			io.ImeWindowHandle = glfwGetWin32Window(g_window);
+			//io.ImeWindowHandle = glfwGetWin32Window(g_window);
 		#endif
 			if (install_callbacks) {
 				glfwSetMouseButtonCallback(window, mouseButtonCallback);

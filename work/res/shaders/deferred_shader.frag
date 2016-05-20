@@ -43,22 +43,25 @@ float read_depth() {
 
 // }
 
+// approximation to integral of phong specular lobe
+float phong_lobe_integral(float a) {
+	return pi * (0.24 + 1.0 / pow(a + 0.5, 0.42) - 0.26 * (1.0 - exp(-sqrt(a * 0.4))));
+}
 
-
-vec3 lambertPhong(vec3 lirrad, vec3 lrad, vec3 ldir, vec3 norm, vec3 vdir, vec3 diffuse, vec3 specular, float shininess) {
+vec3 lambertPhong(vec3 e, vec3 ldir, vec3 norm, vec3 vdir, vec3 diffuse, vec3 specular, float shininess) {
 		vec3 l = vec3(0.0);
 
 		// lambert diffuse radiance leaving surface
-		l += lirrad * max(0.0, dot(ldir, norm)) * diffuse / pi;
+		l += e * diffuse / pi;
+
 		// reflection direction
 		vec3 rdir = reflect(-ldir, norm);
+
 		// phong specular radiance leaving surface
-		// l += lrad * specular * pow(max(0.0, dot(rdir, -vdir)), shininess);
+		l += e * specular * pow(max(0.0, dot(rdir, vdir)), shininess) / phong_lobe_integral(shininess);
 
 		return l;
 }
-
-
 
 
 float cos_atan(float v) {
@@ -118,19 +121,17 @@ void main() {
 		ldir_v = normalize(ldir_v);
 		
 		// Irradiance from light
-		vec3 irradiance = uLights[i].flux / pow(d, 2.0);
+		vec3 e = uLights[i].flux / pow(d, 2.0);
+		e *= max(0.0, dot(ldir_v, norm_v));
 
 		// Radiance from light
-		float lrad = 0.01; // assume the light is a disc (for specular) radius 10mm
+		//float lrad = 0.01; // assume the light is a disc (for specular) radius 10mm
 		// float lsa = 2.0 * pi * (1.0 - cos(atan(lrad / d))); // light solid angle
-
-		float lsa = 2.0 * pi * (1.0 - cos_atan(lrad / d)); // light solid angle
-
-
-		vec3 radiance = irradiance / (lsa + 0.000001); // radiance from light (preventing div-by-0)
+		//float lsa = 2.0 * pi * (1.0 - cos_atan(lrad / d)); // light solid angle
+		//vec3 radiance = e / (lsa + 0.000001); // radiance from light (preventing div-by-0)
 
 		// Add the result of radiance from this light
-		l += lambertPhong(irradiance, radiance, ldir_v, norm_v, dir_v, diffuse, specular, shininess);
+		l += lambertPhong(e, ldir_v, norm_v, -dir_v, diffuse, specular, shininess);
 	}
 
 	// simple tonemapping for HDR
