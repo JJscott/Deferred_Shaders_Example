@@ -84,7 +84,7 @@ vector<Light> g_lights;
 
 // Other Controllable variables
 float g_exposure = 15.0;
-bool g_permute_lights = true;
+bool g_simulate_lights = false;
 int g_num_lights = 10;
 vec3 g_area(10, 10, 10);
 
@@ -171,18 +171,26 @@ void addLight() {
 	// creation
 	vec3 position = (vec3::random(-20, 20) + vec3(0, 20, 0)) * vec3(1, 0.3, 1);
 	vec3 flux = 10 * normalize(vec3::random(0, 1));
-	g_lights.push_back(Light(position, flux));
-
+	Light l = Light(position, flux);
 
 	// intial velocity
 	vec3 velocity = 0.01 * normalize(vec3::random(-1, 1));
-	g_lights[i].vel_w = velocity;
+	l.vel_w = velocity;
+
+	g_lights.push_back(l);
 }
 
 
-void permuteLights() {
-	for (Light &l : g_lights) {
-		l.pos_w += l.vel_w;
+void updateLights() {
+	while(g_lights.size() < g_num_lights)
+		addLight();
+	while(g_lights.size() > g_num_lights)
+		g_lights.pop_back();
+
+	if(g_simulate_lights) {
+		for (Light &l : g_lights) {
+			l.pos_w += l.vel_w;
+		}
 	}
 }
 
@@ -312,10 +320,10 @@ void renderSceneBuffer(int width, int height) {
 
 	// Golden sphere
 	vec3 gold_spec_chroma { 0.9f, 0.8f, 0.6f };
-	glUniform1f(glGetUniformLocation(g_scene_shader, "uShininess"), 300.0);
-	glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, (pow(gold_spec_chroma, vec3(2)) * 0.9f).dataPointer());
+	glUniform1f(glGetUniformLocation(g_scene_shader, "uShininess"), 500.0);
+	glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, (pow(gold_spec_chroma, vec3(2)) * 0.1f).dataPointer());
 	// glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, (pow(gold_spec_chroma, vec3(2))).dataPointer());
-	glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, (gold_spec_chroma * 0.01f).dataPointer());
+	glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, (gold_spec_chroma * 0.9f).dataPointer());
 	cgraSphere(2.0, 100, 100);
 
 
@@ -480,9 +488,10 @@ void renderGUI() {
 
 	ImGui::Separator();
 
-	ImGui::DragFloat("Exposure", &g_exposure, 0.1, 0.0, 100.0, "%.1f");
+	ImGui::SliderFloat("Exposure", &g_exposure, 0.0, 100.0, "%.1f");
+	ImGui::SliderInt("Number of Lights", &g_num_lights, 0, 64);
 
-	ImGui::Checkbox("Permute Lights", &g_permute_lights);
+	ImGui::Checkbox("Simulate Lights", &g_simulate_lights);
 
 	ImGui::End();
 }
@@ -579,7 +588,6 @@ int main(int argc, char **argv) {
 
 
 	// Initialize Geometry/Material/Lights
-	initLights();
 	initShader();
 
 	// Loop until the user closes the window
@@ -591,9 +599,8 @@ int main(int argc, char **argv) {
 		glViewport(0, 0, width, height);
 
 
-		// Simulate
-		if (g_permute_lights)
-			permuteLights();
+		// Update Scene
+		updateLights();
 
 		// Main Render
 		render(width, height);
