@@ -10,6 +10,9 @@ uniform sampler2D uNormal;
 uniform sampler2D uDiffuse;
 uniform sampler2D uSpecular;
 
+const vec3 beta_sc = vec3(0.02);
+const vec3 beta_ex = 1.1 * beta_sc;
+
 struct Light {
 	vec3 pos_v; // Viewspace position
 	vec3 flux;
@@ -37,11 +40,6 @@ float read_depth() {
 }
 
 
-// vec3 lambert(vec3 lflux, vec3 ldir, vec3 norm, vec3 vdir) {
-
-
-
-// }
 
 // approximation to integral of phong specular lobe
 float phong_lobe_integral(float a) {
@@ -63,6 +61,44 @@ vec3 lambertPhong(vec3 e, vec3 ldir, vec3 norm, vec3 vdir, vec3 diffuse, vec3 sp
 		return l;
 }
 
+
+// mie scattering phase function
+float phase_m(float mu) {
+	const float g = 0.75;
+	return 3.0 * (1.0 - g * g) * (1.0 + mu * mu) / (8.0 * pi * (2.0 + g * g) * pow(1.0 + g * g - 2.0 * g * mu, 1.5));
+}
+
+// transmittance over some distance
+vec3 transmittance(float d) {
+	return exp(-beta_ex * d);
+}
+
+// size of next inscatter sample
+float inscatter_sample_size(vec3 pos_v, vec3 dir_v, Light light) {
+	// random hacky stuff, will have to do
+	vec3 ld = light.pos_v - pos_v;
+	float dl2 = dot(ld, ld);
+	ld = normalize(ld);
+	float k = abs(dot(dir_v, ld));
+	return 0.3 + mix(dl2 * 0.02, 0.2 * sqrt(dl2), k);
+}
+
+// inscattered radiance along a ray from a light
+vec3 inscatter(vec3 pos0_v, vec3 dir_v, float d_max, Light light) {
+	vec3 p = pos0_v;
+	vec3 l = vec3(0.0);
+	for (float d = 0.0; d < min(d_max, 100.0); ) {
+		float dd = inscatter_sample_size(p, dir_v, light);
+		vec3 ph = p + dd * 0.5;
+		float dl = length(light.pos_v - ph);
+		float muvs = dot(normalize(light.pos_v - ph), dir_v);
+		vec3 e0 = light.flux / pow(dl, 2.0) * transmittance(dl);
+		l += transmittance(d + 0.5 * dd) * e0 * beta_sc * phase_m(muvs) * dd;
+		p += dd * dir_v;
+		d += dd;
+	}
+	return l;
+}
 
 float cos_atan(float v) {
 	return 1/sqrt(1+v*v);
@@ -120,21 +156,22 @@ void main() {
 		l += diffuse * 0.05;
 
 		for (int i = 0; i < uNumLights; ++i) {
-
 			// direction and distance from fragment to light
 			vec3 ldir_v = uLights[i].pos_v - pos_v;
 			float d = length(ldir_v);
 			ldir_v = normalize(ldir_v);
 			
 			// Irradiance from light
-			vec3 e = uLights[i].flux / pow(d, 2.0);
+			vec3 e = uLights[i].flux / pow(d, 2.0) * transmittance(d);
 			e *= max(0.0, dot(ldir_v, norm_v));
 
-			// Radiance from light
-			//float lrad = 0.01; // assume the light is a disc (for specular) radius 10mm
-			// float lsa = 2.0 * pi * (1.0 - cos(atan(lrad / d))); // light solid angle
-			//float lsa = 2.0 * pi * (1.0 - cos_atan(lrad / d)); // light solid angle
-			//vec3 radiance = e / (lsa + 0.000001); // radiance from light (preventing div-by-0)
+			// Add the result of radiance from this light
+			l += lambertPhong(e, ldir_v, norm_v, -dir_v, diffuse, specular, shininess);
+
+
+			l += inscatter(pos_nearplane, dir_v, 20.0, uLights[i]);
+		}
+
 
 			// Add the result of radiance from this light
 			l += lambertPhong(e, ldir_v, norm_v, -dir_v, diffuse, specular, shininess);
