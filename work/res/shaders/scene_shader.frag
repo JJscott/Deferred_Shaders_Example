@@ -2,6 +2,7 @@
 
 uniform float uZFar;
 
+uniform bool uEmissive;
 uniform vec3 uDiffuse;
 uniform vec3 uSpecular;
 uniform float uShininess;
@@ -24,8 +25,15 @@ void write_depth(float depth_v) {
 void main() {
 	// write_depth(-vPosition.z);
 	write_log_depth(-vPosition.z);
+	
+	// Normal
 	gl_FragData[0].rgb = normalize(vNormal);
+
+	// Diffuse and emissive flag
 	gl_FragData[1].rgb = uDiffuse;
+	gl_FragData[1].a = float(uEmissive);
+
+	// Specular and shininess
 	gl_FragData[2].rgb = uSpecular;
 	gl_FragData[2].a = uShininess;
 }

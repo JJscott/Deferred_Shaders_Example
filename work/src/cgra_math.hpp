@@ -743,7 +743,7 @@ namespace cgra {
 	// component-wise compare of l>r
 	template <typename T1, typename T2>
 	inline bvec2 greaterThan(const vector2<T1> &lhs, const vector2<T2> &rhs) {
-		return bvec2(lhs.x < rhs.x, lhs.y < rhs.y);
+		return bvec2(lhs.x > rhs.x, lhs.y > rhs.y);
 	}
 
 	// component-wise compare of l>=r
@@ -1373,7 +1373,7 @@ namespace cgra {
 	// component-wise compare of l>r
 	template <typename T1, typename T2>
 	inline bvec3 greaterThan(const vector3<T1> &lhs, const vector3<T2> &rhs) {
-		return bvec3(lhs.x < rhs.x, lhs.y < rhs.y, lhs.z < rhs.z);
+		return bvec3(lhs.x > rhs.x, lhs.y > rhs.y, lhs.z > rhs.z);
 	}
 
 	// component-wise compare of l>=r
@@ -2019,7 +2019,7 @@ namespace cgra {
 	// component-wise compare of l>r
 	template <typename T1, typename T2>
 	inline bvec4 greaterThan(const vector4<T1> &lhs, const vector4<T2> &rhs) {
-		return bvec4(lhs.x < rhs.x, lhs.y < rhs.y, lhs.z < rhs.z, lhs.w < rhs.w);
+		return bvec4(lhs.x > rhs.x, lhs.y > rhs.y, lhs.z > rhs.z, lhs.w > rhs.w);
 	}
 
 	// component-wise compare of l>=r

@@ -1,5 +1,6 @@
 #version 120
 
+uniform bool uEmissive;
 uniform vec3 uDiffuse;
 uniform vec3 uSpecular;
 uniform float uShininess;

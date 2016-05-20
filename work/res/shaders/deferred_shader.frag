@@ -101,42 +101,49 @@ void main() {
 	// fragment material properties
 	// 
 	vec3 diffuse = texture2D(uDiffuse, vTextureCoord).rgb;
+	bool emmisive = texture2D(uDiffuse, vTextureCoord).a > 0.5; //hack
 	vec3 specular = texture2D(uSpecular, vTextureCoord).rgb;
 	float shininess = texture2D(uSpecular, vTextureCoord).a;
 
 
+	if (emmisive) {
+		gl_FragColor.rgb = diffuse;
+		gl_FragColor.a = 1.0;
 
+	} else {
 
-	// Now we calculate the lighting
-	// output radiance of surface
-	vec3 l = vec3(0.0);
+		// Now we calculate the lighting
+		// output radiance of surface
+		vec3 l = vec3(0.0);
 
-	// ambient hack to make everything NOT black
-	l += diffuse * 0.05;
+		// ambient hack to make everything NOT black
+		l += diffuse * 0.05;
 
-	for (int i = 0; i < uNumLights; ++i) {
-		// direction and distance from fragment to light
-		vec3 ldir_v = uLights[i].pos_v - pos_v;
-		float d = length(ldir_v);
-		ldir_v = normalize(ldir_v);
-		
-		// Irradiance from light
-		vec3 e = uLights[i].flux / pow(d, 2.0);
-		e *= max(0.0, dot(ldir_v, norm_v));
+		for (int i = 0; i < uNumLights; ++i) {
 
-		// Radiance from light
-		//float lrad = 0.01; // assume the light is a disc (for specular) radius 10mm
-		// float lsa = 2.0 * pi * (1.0 - cos(atan(lrad / d))); // light solid angle
-		//float lsa = 2.0 * pi * (1.0 - cos_atan(lrad / d)); // light solid angle
-		//vec3 radiance = e / (lsa + 0.000001); // radiance from light (preventing div-by-0)
+			// direction and distance from fragment to light
+			vec3 ldir_v = uLights[i].pos_v - pos_v;
+			float d = length(ldir_v);
+			ldir_v = normalize(ldir_v);
+			
+			// Irradiance from light
+			vec3 e = uLights[i].flux / pow(d, 2.0);
+			e *= max(0.0, dot(ldir_v, norm_v));
 
-		// Add the result of radiance from this light
-		l += lambertPhong(e, ldir_v, norm_v, -dir_v, diffuse, specular, shininess);
+			// Radiance from light
+			//float lrad = 0.01; // assume the light is a disc (for specular) radius 10mm
+			// float lsa = 2.0 * pi * (1.0 - cos(atan(lrad / d))); // light solid angle
+			//float lsa = 2.0 * pi * (1.0 - cos_atan(lrad / d)); // light solid angle
+			//vec3 radiance = e / (lsa + 0.000001); // radiance from light (preventing div-by-0)
+
+			// Add the result of radiance from this light
+			l += lambertPhong(e, ldir_v, norm_v, -dir_v, diffuse, specular, shininess);
+		}
+
+		// simple tonemapping for HDR
+		gl_FragColor.rgb = 1.0 - exp(-uExposure * l);
+
+		gl_FragColor.a = 1.0;
 	}
-
-	// simple tonemapping for HDR
-	gl_FragColor.rgb = 1.0 - exp(-uExposure * l);
-
-	gl_FragColor.a = 1.0;
 
 }

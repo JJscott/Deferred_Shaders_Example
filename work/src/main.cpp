@@ -71,11 +71,11 @@ GLuint g_deferred_shader;
 
 // Lights
 struct Light {
-	// vec3 vel_w;
+	vec3 acl_w; // acceleration
 	vec3 vel_w; // velocity
 	vec3 pos_w; // position
 	vec3 flux;
-	Light(vec3 p, vec3 f) : pos_w(p), flux(f) {}
+	Light(vec3 p, vec3 f) : pos_w(p), flux(f), vel_w(0), acl_w(0) { }
 };
 
 vector<Light> g_lights;
@@ -84,9 +84,19 @@ vector<Light> g_lights;
 
 // Other Controllable variables
 float g_exposure = 15.0;
+
+float g_flux_mult = 15.0;
+
+// float g_bloom_thresh = 1.0;
+int g_num_lights = 4;
 bool g_simulate_lights = false;
-int g_num_lights = 10;
-vec3 g_area(10, 10, 10);
+float g_min_light_speed = 0.01;
+float g_max_light_speed = 0.1;
+
+bool g_draw_lights = false;
+
+vec3 g_zone_hize(30, 10, 30);
+vec3 g_zone_position(0, 10, 0);
 
 
 
@@ -170,7 +180,7 @@ void initShader() {
 void addLight() {
 	// creation
 	vec3 position = (vec3::random(-20, 20) + vec3(0, 20, 0)) * vec3(1, 0.3, 1);
-	vec3 flux = 10 * normalize(vec3::random(0, 1));
+	vec3 flux = normalize(vec3::random(0, 1));
 	Light l = Light(position, flux);
 
 	// intial velocity
@@ -188,8 +198,31 @@ void updateLights() {
 		g_lights.pop_back();
 
 	if(g_simulate_lights) {
+
+		vec3 zone_min = g_zone_position - g_zone_hize;
+		vec3 zone_max = g_zone_position + g_zone_hize;
+
 		for (Light &l : g_lights) {
+
+			// apply acceleration if outside zone
+			vec3 accel;
+			accel += 0.01 * mix(vec3(0.0), vec3(1.0), lessThanEqual(l.pos_w, zone_min));
+			accel += 0.01 * mix(vec3(0.0), vec3(-1.0), greaterThanEqual(l.pos_w, zone_max));
+			l.acl_w += accel;
+
+			// update velocities
+			l.vel_w += l.acl_w;
+			l.acl_w = vec3(0);
+
+			// clamp speed to min max speed
+			float speed = length(l.vel_w);
+			if (speed == 0) l.vel_w = vec3(1) * g_min_light_speed;
+			else if (speed < g_min_light_speed) l.vel_w *= g_min_light_speed/speed;
+			else if (speed > g_max_light_speed) l.vel_w *= g_max_light_speed/speed;
+
+			// update position
 			l.pos_w += l.vel_w;
+
 		}
 	}
 }
@@ -320,59 +353,152 @@ void renderSceneBuffer(int width, int height) {
 
 	// Golden sphere
 	vec3 gold_spec_chroma { 0.9f, 0.8f, 0.6f };
-	glUniform1f(glGetUniformLocation(g_scene_shader, "uShininess"), 1000.0);
-	glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, (pow(gold_spec_chroma, vec3(2)) * 0.1f).dataPointer());
-	// glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, (pow(gold_spec_chroma, vec3(2))).dataPointer());
-	glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, (gold_spec_chroma * 0.9f).dataPointer());
-	cgraSphere(2.0, 100, 100);
+	float gold_spec_ratio = 0.9;
+	float gold_shininess = 1000.0;
 
+	glUniform1i(glGetUniformLocation(g_scene_shader, "uEmissive"), false);
+	glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, (pow(gold_spec_chroma, vec3(2)) * (1-gold_spec_ratio)).dataPointer());
+	glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, (gold_spec_chroma * gold_spec_ratio).dataPointer());
+	glUniform1f(glGetUniformLocation(g_scene_shader, "uShininess"), gold_shininess);
 
-
-
-	// Box
 	glPushMatrix();
-		// Silver floor
-		vec3 silver_spec_chroma { 0.8f };
-		glUniform1f(glGetUniformLocation(g_scene_shader, "uShininess"), 300.0);
-		glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, (pow(silver_spec_chroma, vec3(2)) * 0.5f).dataPointer());
-		// glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, (pow(silver_spec_chroma, vec3(2))).dataPointer());
-		glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, (silver_spec_chroma * 0.5f).dataPointer());
+		glTranslatef(0,4,0);
+		cgraSphere(4.0, 100, 100);
+	glPopMatrix();
 
 
-		glTranslatef(0,-2,0);
+
+	// White pillar
+	vec3 white_spec_chroma { 0.9f, 0.8f, 0.6f };
+	float white_spec_ratio = 0.5;
+	float white_shininess = 1.0;
+
+	glUniform1i(glGetUniformLocation(g_scene_shader, "uEmissive"), false);
+	glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, (pow(white_spec_chroma, vec3(2)) * (1-white_spec_ratio)).dataPointer());
+	glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, (white_spec_chroma * white_spec_ratio).dataPointer());
+	glUniform1f(glGetUniformLocation(g_scene_shader, "uShininess"), white_shininess);
+
+	glPushMatrix();
+		glTranslatef(15,0,15);
+		glRotatef(-90, 1, 0, 0);
+		cgraCylinder(2.0, 2.0, 20, 100, 100);
+	glPopMatrix();
+
+
+
+
+	// Red Cone
+	vec3 red_spec_chroma { 0.9f, 0.1f, 0.1f };
+	float red_spec_ratio = 0.8;
+	float red_shininess = 300.0;
+
+	glUniform1i(glGetUniformLocation(g_scene_shader, "uEmissive"), false);
+	glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, (pow(red_spec_chroma, vec3(2)) * (1-red_spec_ratio)).dataPointer());
+	glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, (red_spec_chroma * red_spec_ratio).dataPointer());
+	glUniform1f(glGetUniformLocation(g_scene_shader, "uShininess"), red_shininess);
+
+	glPushMatrix();
+		glTranslatef(-15,0,15);
+		glRotatef(-90, 1, 0, 0);
+		cgraCone(3.0, 8.0, 100, 100);
+	glPopMatrix();
+
+
+
+
+
+	// Green bottom heavy cylinder
+	vec3 green_spec_chroma { 0.1f, 0.9f, 0.1f };
+	float green_spec_ratio = 0.5;
+	float green_shininess = 100.0;
+
+	glUniform1i(glGetUniformLocation(g_scene_shader, "uEmissive"), false);
+	glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, (pow(green_spec_chroma, vec3(2)) * (1-green_spec_ratio)).dataPointer());
+	glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, (green_spec_chroma * green_spec_ratio).dataPointer());
+	glUniform1f(glGetUniformLocation(g_scene_shader, "uShininess"), green_shininess);
+
+	glPushMatrix();
+		glTranslatef(15,0,-15);
+		glRotatef(-90, 1, 0, 0);
+		cgraCylinder(4.0, 1.0, 20, 100, 100);
+	glPopMatrix();
+
+
+
+	// Blue top heavy cylinder
+	vec3 blue_spec_chroma { 0.1f, 0.1f, 0.9f };
+	float blue_spec_ratio = 0.2;
+	float blue_shininess = 1.0;
+
+	glUniform1i(glGetUniformLocation(g_scene_shader, "uEmissive"), false);
+	glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, (pow(blue_spec_chroma, vec3(2)) * (1-blue_spec_ratio)).dataPointer());
+	glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, (blue_spec_chroma * blue_spec_ratio).dataPointer());
+	glUniform1f(glGetUniformLocation(g_scene_shader, "uShininess"), blue_shininess);
+
+	glPushMatrix();
+		glTranslatef(-15,0,-15);
+		glRotatef(-90, 1, 0, 0);
+		cgraCylinder(1.5, 3.0, 20, 100, 100);
+	glPopMatrix();
+
+
+
+
+
+	// Silver floor
+	vec3 silver_spec_chroma { 0.8f };
+	float silver_spec_ratio = 0.5;
+	float silver_shininess = 100.0;
+
+	glUniform1i(glGetUniformLocation(g_scene_shader, "uEmissive"), false);
+	glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, (pow(silver_spec_chroma, vec3(2)) * silver_spec_ratio).dataPointer());
+	glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, (silver_spec_chroma * silver_spec_ratio).dataPointer());
+	glUniform1f(glGetUniformLocation(g_scene_shader, "uShininess"), silver_shininess);
+
+	glPushMatrix();
+		glTranslatef(0,-0.01,0);
 		glBegin(GL_TRIANGLES);
 		glNormal3f(0, 1.0, 0);
-		glVertex3f(-20.0, 0, -20.0);
-		glVertex3f( 20.0, 0, -20.0);
-		glVertex3f(-20.0, 0,  20.0);
-		glVertex3f( 20.0, 0, -20.0);
-		glVertex3f( 20.0, 0,  20.0);
-		glVertex3f(-20.0, 0,  20.0);
+		glVertex3f(-40.0, 0, -40.0);
+		glVertex3f( 40.0, 0, -40.0);
+		glVertex3f(-40.0, 0,  40.0);
+		glVertex3f( 40.0, 0, -40.0);
+		glVertex3f( 40.0, 0,  40.0);
+		glVertex3f(-40.0, 0,  40.0);
 		glEnd();
 		glFlush();
 	glPopMatrix();
+
+
+
 
 
 	// Big grey sphere
 	glPushMatrix();
 		vec3 grey(0.8, 0.8, 0.8);
 		glTranslatef(0,0, 4000000);
-		glUniform1f(glGetUniformLocation(g_scene_shader, "uShininess"), 1.0);
+		glUniform1i(glGetUniformLocation(g_scene_shader, "uEmissive"), false);
 		glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, grey.dataPointer());
 		glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, grey.dataPointer());
+		glUniform1f(glGetUniformLocation(g_scene_shader, "uShininess"), 1.0);
 		cgraSphere(1500000, 100, 100);
 	glPopMatrix();
 
 
+
+
+
+
 	//Draw Lights
-	for (const Light &l : g_lights) {
-		glPushMatrix();
-			glTranslatef(l.pos_w.x, l.pos_w.y, l.pos_w.z);
-			glUniform1f(glGetUniformLocation(g_scene_shader, "uShininess"), 1.0);
-			glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, vec3(1).dataPointer());
-			glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, vec3(0).dataPointer());
-			cgraSphere(0.1);
-		glPopMatrix();
+	if (g_draw_lights) {
+		for (const Light &l : g_lights) {
+			glPushMatrix();
+				glTranslatef(l.pos_w.x, l.pos_w.y, l.pos_w.z);
+				glUniform1i(glGetUniformLocation(g_scene_shader, "uEmissive"), true);
+				glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, normalize(l.flux).dataPointer());
+				cgraSphere(0.1);
+			glPopMatrix();
+		}
 	}
 
 
@@ -455,7 +581,7 @@ void renderDeferred(int width, int height) {
 		
 		ss = ostringstream();
 		ss << "uLights[" << i << "].flux";
-		glUniform3fv(glGetUniformLocation(g_deferred_shader, ss.str().c_str()), 1, g_lights[i].flux.dataPointer());
+		glUniform3fv(glGetUniformLocation(g_deferred_shader, ss.str().c_str()), 1, (g_flux_mult * g_lights[i].flux).dataPointer());
 	}
 
 
@@ -489,9 +615,19 @@ void renderGUI() {
 	ImGui::Separator();
 
 	ImGui::SliderFloat("Exposure", &g_exposure, 0.0, 100.0, "%.1f");
-	ImGui::SliderInt("Number of Lights", &g_num_lights, 0, 64);
+	ImGui::SliderFloat("Flux Multiplier", &g_flux_mult, 1.0, 100.0, "%.0f");
 
+
+	ImGui::SliderInt("# of Lights", &g_num_lights, 0, 64);
+
+	ImGui::Checkbox("Draw Lights", &g_draw_lights);
 	ImGui::Checkbox("Simulate Lights", &g_simulate_lights);
+	if (g_simulate_lights) {
+		ImGui::SliderFloat("Min speed", &g_min_light_speed, 0.0, 1.0, "%.1f");
+		if (ImGui::SliderFloat("Max speed", &g_max_light_speed, 0.0, 1.0, "%.1f")) {
+			g_max_light_speed = std::max(g_min_light_speed, g_max_light_speed);
+		}
+	}
 
 	ImGui::End();
 }
