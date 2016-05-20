@@ -169,12 +169,7 @@ void main() {
 			l += lambertPhong(e, ldir_v, norm_v, -dir_v, diffuse, specular, shininess);
 
 
-			l += inscatter(pos_nearplane, dir_v, 20.0, uLights[i]);
-		}
-
-
-			// Add the result of radiance from this light
-			l += lambertPhong(e, ldir_v, norm_v, -dir_v, diffuse, specular, shininess);
+			l += inscatter(pos_nearplane, dir_v, length(pos_v), uLights[i]);
 		}
 
 		// simple tonemapping for HDR
