@@ -10,16 +10,18 @@ SET(headers
 	"opengl.hpp"
 	"simple_shader.hpp"
 	"simple_image.hpp"
+	"simple_gui.hpp"
 )
 
 
 # TODO list your source files (.cpp) here
 SET(sources
 	"main.cpp"
+	"simple_gui.cpp"
 )
 
 # Add executable target and link libraries
 # You do not need to touch this
 add_executable(${CGRA_PROJECT} ${headers} ${sources})
 target_link_libraries(${CGRA_PROJECT} PRIVATE glew glfw ${GLFW_LIBRARIES})
-target_link_libraries(${CGRA_PROJECT} PRIVATE stb)
+target_link_libraries(${CGRA_PROJECT} PRIVATE stb imgui)

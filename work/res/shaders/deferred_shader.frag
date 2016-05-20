@@ -53,7 +53,7 @@ vec3 lambertPhong(vec3 lirrad, vec3 lrad, vec3 ldir, vec3 norm, vec3 vdir, vec3 
 		// reflection direction
 		vec3 rdir = reflect(-ldir, norm);
 		// phong specular radiance leaving surface
-		l += lrad * specular * pow(max(0.0, dot(rdir, -vdir)), shininess);
+		// l += lrad * specular * pow(max(0.0, dot(rdir, -vdir)), shininess);
 
 		return l;
 }
@@ -68,7 +68,8 @@ float cos_atan(float v) {
 
 void main() {
 	// view-space depth (+ve)
-	float depth_v = read_depth();
+	// float depth_v = read_depth();
+	float depth_v = read_log_depth();
 
 	// view-space near plane ray intersection
 	vec4 projection_nearplane = gl_ProjectionMatrixInverse * vec4((vTextureCoord * 2.0 - 1.0), -1.0, 1.0);
@@ -81,9 +82,12 @@ void main() {
 	vec4 projection_farplane = gl_ProjectionMatrixInverse * vec4((vTextureCoord * 2.0 - 1.0), uZUnproject, 1.0);
 	vec3 pos_farplane = (projection_farplane / projection_farplane.w).xyz;
 	
-	// view-space ray direction
+	// view-space ray direction (from viewer to frament)
+	// 
 	vec3 dir_v = normalize(pos_farplane - pos_nearplane);
+
 	// view-space fragment position
+	// 
 	vec3 pos_v = pos_nearplane + dir_v * ((depth_v + pos_nearplane.z) / -dir_v.z);
 
 
@@ -98,6 +102,9 @@ void main() {
 	float shininess = texture2D(uSpecular, vTextureCoord).a;
 
 
+
+
+	// Now we calculate the lighting
 	// output radiance of surface
 	vec3 l = vec3(0.0);
 
@@ -105,9 +112,9 @@ void main() {
 	l += diffuse * 0.05;
 
 	for (int i = 0; i < uNumLights; ++i) {
-		// direction & distance from fragment to light
+		// direction and distance from fragment to light
 		vec3 ldir_v = uLights[i].pos_v - pos_v;
-		float d = dot(ldir_v, ldir_v);
+		float d = length(ldir_v);
 		ldir_v = normalize(ldir_v);
 		
 		// Irradiance from light

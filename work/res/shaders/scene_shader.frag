@@ -22,7 +22,8 @@ void write_depth(float depth_v) {
 }
 
 void main() {
-	write_depth(-vPosition.z);
+	// write_depth(-vPosition.z);
+	write_log_depth(-vPosition.z);
 	gl_FragData[0].rgb = normalize(vNormal);
 	gl_FragData[1].rgb = uDiffuse;
 	gl_FragData[2].rgb = uSpecular;

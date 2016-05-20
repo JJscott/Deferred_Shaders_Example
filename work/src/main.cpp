@@ -25,6 +25,7 @@
 #include "cgra_math.hpp"
 #include "simple_image.hpp"
 #include "simple_shader.hpp"
+#include "simple_gui.hpp"
 #include "opengl.hpp"
 
 using namespace std;
@@ -39,8 +40,7 @@ GLFWwindow* g_window;
 // 
 float g_fovy = 60.0;
 float g_znear = 0.1;
-// float g_zfar = 20000000.0;
-float g_zfar = 200.0;
+float g_zfar = 20000000.0;
 
 
 // Mouse controlled Camera values
@@ -61,25 +61,30 @@ GLuint g_tex_scene_normal = 0;
 GLuint g_tex_scene_diffuse = 0;
 GLuint g_tex_scene_specular = 0;
 
+
 // Shaders
 //
 GLuint g_scene_shader;
-GLuint g_scene_texture_shader;
-
 GLuint g_deferred_shader;
 
-float g_exposure = 15.0;
 
 
 // Lights
 struct Light {
-	// @josh what made you think it made sense to store this directly in view space?
-	vec3 pos_w;
+	// vec3 vel_w;
+	vec3 vel_w; // velocity
+	vec3 pos_w; // position
 	vec3 flux;
 	Light(vec3 p, vec3 f) : pos_w(p), flux(f) {}
 };
 
 vector<Light> g_lights;
+
+
+
+// Controllable variables
+float g_exposure = 15.0;
+bool g_permute_lights = true;
 
 
 
@@ -102,6 +107,9 @@ void cursorPosCallback(GLFWwindow* win, double xpos, double ypos) {
 //
 void mouseButtonCallback(GLFWwindow *win, int button, int action, int mods) {
 	// cout << "Mouse Button Callback :: button=" << button << "action=" << action << "mods=" << mods << endl;
+	SimpleGUI::mouseButtonCallback(win, button, action, mods);
+	if(ImGui::IsMouseHoveringAnyWindow()) return; // block input with gui 
+
 	if (button == GLFW_MOUSE_BUTTON_LEFT)
 		g_leftMouseDown = (action == GLFW_PRESS);
 }
@@ -112,6 +120,9 @@ void mouseButtonCallback(GLFWwindow *win, int button, int action, int mods) {
 //
 void scrollCallback(GLFWwindow *win, double xoffset, double yoffset) {
 	// cout << "Scroll Callback :: xoffset=" << xoffset << "yoffset=" << yoffset << endl;
+	SimpleGUI::scrollCallback(win, xoffset, yoffset);
+	if(ImGui::IsMouseHoveringAnyWindow()) return; // block input with gui
+
 	g_zoom -= yoffset * g_zoom * 0.2;
 }
 
@@ -122,16 +133,9 @@ void scrollCallback(GLFWwindow *win, double xoffset, double yoffset) {
 void keyCallback(GLFWwindow *win, int key, int scancode, int action, int mods) {
 	// cout << "Key Callback :: key=" << key << "scancode=" << scancode
 	// 	<< "action=" << action << "mods=" << mods << endl;
-	if (action == GLFW_PRESS) {
-		switch(key) {
-		case GLFW_KEY_UP:
-			g_exposure += 1;
-			break;
-		case GLFW_KEY_DOWN:
-			g_exposure -= 1;
-			break;
-		}
-	}
+	SimpleGUI::keyCallback(win, key, scancode, action, mods);
+	if(ImGui::IsAnyItemActive()) return; // block input with gui
+
 }
 
 
@@ -140,7 +144,8 @@ void keyCallback(GLFWwindow *win, int key, int scancode, int action, int mods) {
 //
 void charCallback(GLFWwindow *win, unsigned int c) {
 	// cout << "Char Callback :: c=" << char(c) << endl;
-	// Not needed for this assignment, but useful to have later on
+	SimpleGUI::charCallback(win, c);
+	if(ImGui::IsAnyItemActive()) return; // block input with gui
 }
 
 
@@ -163,9 +168,23 @@ void initShader() {
 
 void initLights() {
 	for (int i = 0; i < 64; ++i) {
-		vec3 position = vec3::random(-20, 20) + vec3(0, 20, 0);
-		vec3 flux = 0.02 * normalize(vec3::random(0, 1));
+
+		// creation
+		vec3 position = (vec3::random(-20, 20) + vec3(0, 20, 0)) * vec3(1, 0.3, 1);
+		vec3 flux = 10 * normalize(vec3::random(0, 1));
 		g_lights.push_back(Light(position, flux));
+
+
+		// intial velocity
+		vec3 velocity = 0.01 * normalize(vec3::random(-1, 1));
+		g_lights[i].vel_w = velocity;
+	}
+}
+
+
+void permuteLights() {
+	for (Light &l : g_lights) {
+		l.pos_w += l.vel_w;
 	}
 }
 
@@ -295,7 +314,7 @@ void renderSceneBuffer(int width, int height) {
 
 	// Golden sphere
 	vec3 gold_spec_chroma { 0.9f, 0.8f, 0.6f };
-	glUniform1f(glGetUniformLocation(g_scene_shader, "uShininess"), 1.0);
+	glUniform1f(glGetUniformLocation(g_scene_shader, "uShininess"), 300.0);
 	glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, (pow(gold_spec_chroma, vec3(2)) * 0.9f).dataPointer());
 	// glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, (pow(gold_spec_chroma, vec3(2))).dataPointer());
 	glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, (gold_spec_chroma * 0.01f).dataPointer());
@@ -309,9 +328,9 @@ void renderSceneBuffer(int width, int height) {
 		// Silver floor
 		vec3 silver_spec_chroma { 0.8f };
 		glUniform1f(glGetUniformLocation(g_scene_shader, "uShininess"), 300.0);
-		glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, (pow(silver_spec_chroma, vec3(2)) * 0.3f).dataPointer());
+		glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, (pow(silver_spec_chroma, vec3(2)) * 0.5f).dataPointer());
 		// glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, (pow(silver_spec_chroma, vec3(2))).dataPointer());
-		glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, (silver_spec_chroma * 0.6f).dataPointer());
+		glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, (silver_spec_chroma * 0.5f).dataPointer());
 
 
 		glTranslatef(0,-2,0);
@@ -412,12 +431,11 @@ void renderDeferred(int width, int height) {
 
 
 
-
-
 	// Setup the camera again, so the GL_MODELVIEW_MATRIX contains just the view matrix
 	setupCamera(width, height);
 	mat4 view;
 	glGetFloatv(GL_MODELVIEW_MATRIX, view.dataPointer());
+
 
 	// Upload lights
 	// Positions must be in view-space
@@ -436,6 +454,7 @@ void renderDeferred(int width, int height) {
 
 
 	// Draw a triangle that covers the screen
+	// This does the deferred shading pass
 	glBegin(GL_TRIANGLES);
 	glVertex3f(-1.0, -1.0, 0.0);
 	glVertex3f(3.0, -1.0, 0.0);
@@ -453,6 +472,23 @@ void render(int width, int height) {
 	renderSceneBuffer(width, height);
 	renderDeferred(width, height);
 }
+
+
+// Draw GUI function
+//
+void renderGUI() {
+	ImGui::Begin("Debug");
+	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+
+	ImGui::Separator();
+
+	ImGui::DragFloat("Exposure", &g_exposure, 0.1, 0.0, 100.0, "%.1f");
+
+	ImGui::Checkbox("Permute Lights", &g_permute_lights);
+
+	ImGui::End();
+}
+
 
 
 // Forward decleration for cleanliness (Ignore)
@@ -531,6 +567,19 @@ int main(int argc, char **argv) {
 	}
 
 
+
+	// Initialize IMGUI
+	// Second argument is true if we dont need to use GLFW bindings for input
+	// if set to false we must manually call the SimpleGUI callbacks when we
+	// process the input.
+	if (!SimpleGUI::init(g_window, false)) {
+		cerr << "Error: Could not initialize IMGUI" << endl;
+		abort();
+	}
+
+
+
+
 	// Initialize Geometry/Material/Lights
 	initLights();
 	initShader();
@@ -543,8 +592,18 @@ int main(int argc, char **argv) {
 		glfwGetFramebufferSize(g_window, &width, &height);
 		glViewport(0, 0, width, height);
 
+
+		// Simulate
+		if (g_permute_lights)
+			permuteLights();
+
 		// Main Render
 		render(width, height);
+
+		// Render GUI on top
+		SimpleGUI::newFrame();
+		renderGUI();
+		SimpleGUI::render();
 
 		// Swap front and back buffers
 		glfwSwapBuffers(g_window);
