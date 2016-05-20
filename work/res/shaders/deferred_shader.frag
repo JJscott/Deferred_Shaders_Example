@@ -95,8 +95,8 @@ void main() {
 
 
 	// view-space normal
-	// 
-	vec3 norm_v = texture2D(uNormal, vTextureCoord).xyz;
+	// need to renormalize because normals are stored in lower precision
+	vec3 norm_v = normalize(texture2D(uNormal, vTextureCoord).xyz);
 
 	// fragment material properties
 	// 

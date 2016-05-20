@@ -314,7 +314,7 @@ void renderSceneBuffer(int width, int height) {
 
 	// Golden sphere
 	vec3 gold_spec_chroma { 0.9f, 0.8f, 0.6f };
-	glUniform1f(glGetUniformLocation(g_scene_shader, "uShininess"), 500.0);
+	glUniform1f(glGetUniformLocation(g_scene_shader, "uShininess"), 1000.0);
 	glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, (pow(gold_spec_chroma, vec3(2)) * 0.1f).dataPointer());
 	// glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, (pow(gold_spec_chroma, vec3(2))).dataPointer());
 	glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, (gold_spec_chroma * 0.9f).dataPointer());
