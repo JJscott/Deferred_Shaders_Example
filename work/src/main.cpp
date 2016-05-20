@@ -82,9 +82,11 @@ vector<Light> g_lights;
 
 
 
-// Controllable variables
+// Other Controllable variables
 float g_exposure = 15.0;
 bool g_permute_lights = true;
+int g_num_lights = 10;
+vec3 g_area(10, 10, 10);
 
 
 
@@ -165,20 +167,16 @@ void initShader() {
 }
 
 
-
-void initLights() {
-	for (int i = 0; i < 64; ++i) {
-
-		// creation
-		vec3 position = (vec3::random(-20, 20) + vec3(0, 20, 0)) * vec3(1, 0.3, 1);
-		vec3 flux = 10 * normalize(vec3::random(0, 1));
-		g_lights.push_back(Light(position, flux));
+void addLight() {
+	// creation
+	vec3 position = (vec3::random(-20, 20) + vec3(0, 20, 0)) * vec3(1, 0.3, 1);
+	vec3 flux = 10 * normalize(vec3::random(0, 1));
+	g_lights.push_back(Light(position, flux));
 
 
-		// intial velocity
-		vec3 velocity = 0.01 * normalize(vec3::random(-1, 1));
-		g_lights[i].vel_w = velocity;
-	}
+	// intial velocity
+	vec3 velocity = 0.01 * normalize(vec3::random(-1, 1));
+	g_lights[i].vel_w = velocity;
 }
 
 
@@ -323,7 +321,7 @@ void renderSceneBuffer(int width, int height) {
 
 
 
-	// Table
+	// Box
 	glPushMatrix();
 		// Silver floor
 		vec3 silver_spec_chroma { 0.8f };
