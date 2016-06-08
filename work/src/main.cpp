@@ -35,13 +35,11 @@ using namespace cgra;
 //
 GLFWwindow* g_window;
 
-
 // Projection values
 // 
 float g_fovy = 60.0;
 float g_znear = 0.1;
 float g_zfar = 20000000.0;
-
 
 // Mouse controlled Camera values
 //
@@ -50,7 +48,6 @@ vec2 g_mousePosition;
 float g_pitch = 0;
 float g_yaw = 0;
 float g_zoom = 1.0;
-
 
 // Buffers
 //
@@ -61,13 +58,13 @@ GLuint g_tex_scene_normal = 0;
 GLuint g_tex_scene_diffuse = 0;
 GLuint g_tex_scene_specular = 0;
 
+// Display list
+GLuint g_display_list;
 
 // Shaders
 //
 GLuint g_scene_shader;
 GLuint g_deferred_shader;
-
-
 
 // Lights
 struct Light {
@@ -79,8 +76,6 @@ struct Light {
 };
 
 vector<Light> g_lights;
-
-
 
 // Other Controllable variables
 float g_exposure = 15.0;
@@ -97,9 +92,6 @@ bool g_draw_lights = false;
 
 vec3 g_zone_hize(30, 10, 30);
 vec3 g_zone_position(0, 10, 0);
-
-
-
 
 // Mouse Button callback
 // Called for mouse movement event on since the last glfwPollEvents
@@ -174,6 +166,148 @@ void initShader() {
 		{GL_VERTEX_SHADER, GL_FRAGMENT_SHADER },
 		{ "./work/res/shaders/deferred_shader.vert", "./work/res/shaders/deferred_shader.frag" }
 	);
+}
+
+void initDisplayList() {
+    if (g_display_list) glDeleteLists(g_display_list, 1);
+
+    g_display_list = glGenLists(1);
+    glNewList(g_display_list, GL_COMPILE);
+
+	glUseProgram(g_scene_shader);
+
+	// Render scene 
+	//
+	glUniform1f(glGetUniformLocation(g_scene_shader, "uZFar"), g_zfar);
+
+	// Golden sphere
+	vec3 gold_spec_chroma { 0.9f, 0.8f, 0.6f };
+	float gold_spec_ratio = 0.9;
+	float gold_shininess = 1000.0;
+
+	glUniform1i(glGetUniformLocation(g_scene_shader, "uEmissive"), false);
+	glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, (pow(gold_spec_chroma, vec3(2)) * (1-gold_spec_ratio)).dataPointer());
+	glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, (gold_spec_chroma * gold_spec_ratio).dataPointer());
+	glUniform1f(glGetUniformLocation(g_scene_shader, "uShininess"), gold_shininess);
+
+	glPushMatrix();
+		glTranslatef(0,4,0);
+		cgraSphere(4.0, 100, 100);
+	glPopMatrix();
+
+	// White pillar
+	vec3 white_spec_chroma { 0.9f, 0.8f, 0.6f };
+	float white_spec_ratio = 0.5;
+	float white_shininess = 1.0;
+
+	glUniform1i(glGetUniformLocation(g_scene_shader, "uEmissive"), false);
+	glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, (pow(white_spec_chroma, vec3(2)) * (1-white_spec_ratio)).dataPointer());
+	glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, (white_spec_chroma * white_spec_ratio).dataPointer());
+	glUniform1f(glGetUniformLocation(g_scene_shader, "uShininess"), white_shininess);
+
+	glPushMatrix();
+		glTranslatef(15,0,15);
+		glRotatef(-90, 1, 0, 0);
+		cgraCylinder(2.0, 2.0, 20, 100, 100);
+	glPopMatrix();
+
+	// Red Cone
+	vec3 red_spec_chroma { 0.9f, 0.1f, 0.1f };
+	float red_spec_ratio = 0.8;
+	float red_shininess = 300.0;
+
+	glUniform1i(glGetUniformLocation(g_scene_shader, "uEmissive"), false);
+	glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, (pow(red_spec_chroma, vec3(2)) * (1-red_spec_ratio)).dataPointer());
+	glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, (red_spec_chroma * red_spec_ratio).dataPointer());
+	glUniform1f(glGetUniformLocation(g_scene_shader, "uShininess"), red_shininess);
+
+	glPushMatrix();
+		glTranslatef(-15,0,15);
+		glRotatef(-90, 1, 0, 0);
+		cgraCone(3.0, 8.0, 100, 100);
+	glPopMatrix();
+
+	// Green bottom heavy cylinder
+	vec3 green_spec_chroma { 0.1f, 0.9f, 0.1f };
+	float green_spec_ratio = 0.5;
+	float green_shininess = 100.0;
+
+	glUniform1i(glGetUniformLocation(g_scene_shader, "uEmissive"), false);
+	glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, (pow(green_spec_chroma, vec3(2)) * (1-green_spec_ratio)).dataPointer());
+	glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, (green_spec_chroma * green_spec_ratio).dataPointer());
+	glUniform1f(glGetUniformLocation(g_scene_shader, "uShininess"), green_shininess);
+
+	glPushMatrix();
+		glTranslatef(15,0,-15);
+		glRotatef(-90, 1, 0, 0);
+		cgraCylinder(4.0, 1.0, 20, 100, 100);
+	glPopMatrix();
+
+	// Blue top heavy cylinder
+	vec3 blue_spec_chroma { 0.1f, 0.1f, 0.9f };
+	float blue_spec_ratio = 0.2;
+	float blue_shininess = 1.0;
+
+	glUniform1i(glGetUniformLocation(g_scene_shader, "uEmissive"), false);
+	glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, (pow(blue_spec_chroma, vec3(2)) * (1-blue_spec_ratio)).dataPointer());
+	glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, (blue_spec_chroma * blue_spec_ratio).dataPointer());
+	glUniform1f(glGetUniformLocation(g_scene_shader, "uShininess"), blue_shininess);
+
+	glPushMatrix();
+		glTranslatef(-15,0,-15);
+		glRotatef(-90, 1, 0, 0);
+		cgraCylinder(1.5, 3.0, 20, 100, 100);
+	glPopMatrix();
+
+	// Silver floor
+	vec3 silver_spec_chroma { 0.8f };
+	float silver_spec_ratio = 0.5;
+	float silver_shininess = 100.0;
+
+	glUniform1i(glGetUniformLocation(g_scene_shader, "uEmissive"), false);
+	glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, (pow(silver_spec_chroma, vec3(2)) * silver_spec_ratio).dataPointer());
+	glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, (silver_spec_chroma * silver_spec_ratio).dataPointer());
+	glUniform1f(glGetUniformLocation(g_scene_shader, "uShininess"), silver_shininess);
+
+	glPushMatrix();
+		glTranslatef(0,-0.01,0);
+		glBegin(GL_TRIANGLES);
+		glNormal3f(0, 1.0, 0);
+		glVertex3f(-40.0, 0, -40.0);
+		glVertex3f( 40.0, 0, -40.0);
+		glVertex3f(-40.0, 0,  40.0);
+		glVertex3f( 40.0, 0, -40.0);
+		glVertex3f( 40.0, 0,  40.0);
+		glVertex3f(-40.0, 0,  40.0);
+		glEnd();
+		glFlush();
+	glPopMatrix();
+
+	// Big grey sphere
+	glPushMatrix();
+		vec3 grey(0.8, 0.8, 0.8);
+		glTranslatef(0,0, 4000000);
+		glUniform1i(glGetUniformLocation(g_scene_shader, "uEmissive"), false);
+		glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, grey.dataPointer());
+		glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, grey.dataPointer());
+		glUniform1f(glGetUniformLocation(g_scene_shader, "uShininess"), 1.0);
+		cgraSphere(1500000, 100, 100);
+	glPopMatrix();
+
+	//Draw Lights
+	if (g_draw_lights) {
+		for (const Light &l : g_lights) {
+			glPushMatrix();
+				glTranslatef(l.pos_w.x, l.pos_w.y, l.pos_w.z);
+				glUniform1i(glGetUniformLocation(g_scene_shader, "uEmissive"), true);
+				glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, normalize(l.flux).dataPointer());
+				cgraSphere(0.1);
+			glPopMatrix();
+		}
+	}
+
+	glUseProgram(0);
+    glEndList();
 }
 
 
@@ -337,179 +471,17 @@ void renderSceneBuffer(int width, int height) {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
 
-
 	// Enable flags for scene buffer rendering
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_NORMALIZE);
 
 	setupCamera(width, height);
 
-	glUseProgram(g_scene_shader);
-
-	// Render scene 
-	//
-	glUniform1f(glGetUniformLocation(g_scene_shader, "uZFar"), g_zfar);
-
-
-	// Golden sphere
-	vec3 gold_spec_chroma { 0.9f, 0.8f, 0.6f };
-	float gold_spec_ratio = 0.9;
-	float gold_shininess = 1000.0;
-
-	glUniform1i(glGetUniformLocation(g_scene_shader, "uEmissive"), false);
-	glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, (pow(gold_spec_chroma, vec3(2)) * (1-gold_spec_ratio)).dataPointer());
-	glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, (gold_spec_chroma * gold_spec_ratio).dataPointer());
-	glUniform1f(glGetUniformLocation(g_scene_shader, "uShininess"), gold_shininess);
-
-	glPushMatrix();
-		glTranslatef(0,4,0);
-		cgraSphere(4.0, 100, 100);
-	glPopMatrix();
-
-
-
-	// White pillar
-	vec3 white_spec_chroma { 0.9f, 0.8f, 0.6f };
-	float white_spec_ratio = 0.5;
-	float white_shininess = 1.0;
-
-	glUniform1i(glGetUniformLocation(g_scene_shader, "uEmissive"), false);
-	glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, (pow(white_spec_chroma, vec3(2)) * (1-white_spec_ratio)).dataPointer());
-	glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, (white_spec_chroma * white_spec_ratio).dataPointer());
-	glUniform1f(glGetUniformLocation(g_scene_shader, "uShininess"), white_shininess);
-
-	glPushMatrix();
-		glTranslatef(15,0,15);
-		glRotatef(-90, 1, 0, 0);
-		cgraCylinder(2.0, 2.0, 20, 100, 100);
-	glPopMatrix();
-
-
-
-
-	// Red Cone
-	vec3 red_spec_chroma { 0.9f, 0.1f, 0.1f };
-	float red_spec_ratio = 0.8;
-	float red_shininess = 300.0;
-
-	glUniform1i(glGetUniformLocation(g_scene_shader, "uEmissive"), false);
-	glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, (pow(red_spec_chroma, vec3(2)) * (1-red_spec_ratio)).dataPointer());
-	glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, (red_spec_chroma * red_spec_ratio).dataPointer());
-	glUniform1f(glGetUniformLocation(g_scene_shader, "uShininess"), red_shininess);
-
-	glPushMatrix();
-		glTranslatef(-15,0,15);
-		glRotatef(-90, 1, 0, 0);
-		cgraCone(3.0, 8.0, 100, 100);
-	glPopMatrix();
-
-
-
-
-
-	// Green bottom heavy cylinder
-	vec3 green_spec_chroma { 0.1f, 0.9f, 0.1f };
-	float green_spec_ratio = 0.5;
-	float green_shininess = 100.0;
-
-	glUniform1i(glGetUniformLocation(g_scene_shader, "uEmissive"), false);
-	glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, (pow(green_spec_chroma, vec3(2)) * (1-green_spec_ratio)).dataPointer());
-	glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, (green_spec_chroma * green_spec_ratio).dataPointer());
-	glUniform1f(glGetUniformLocation(g_scene_shader, "uShininess"), green_shininess);
-
-	glPushMatrix();
-		glTranslatef(15,0,-15);
-		glRotatef(-90, 1, 0, 0);
-		cgraCylinder(4.0, 1.0, 20, 100, 100);
-	glPopMatrix();
-
-
-
-	// Blue top heavy cylinder
-	vec3 blue_spec_chroma { 0.1f, 0.1f, 0.9f };
-	float blue_spec_ratio = 0.2;
-	float blue_shininess = 1.0;
-
-	glUniform1i(glGetUniformLocation(g_scene_shader, "uEmissive"), false);
-	glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, (pow(blue_spec_chroma, vec3(2)) * (1-blue_spec_ratio)).dataPointer());
-	glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, (blue_spec_chroma * blue_spec_ratio).dataPointer());
-	glUniform1f(glGetUniformLocation(g_scene_shader, "uShininess"), blue_shininess);
-
-	glPushMatrix();
-		glTranslatef(-15,0,-15);
-		glRotatef(-90, 1, 0, 0);
-		cgraCylinder(1.5, 3.0, 20, 100, 100);
-	glPopMatrix();
-
-
-
-
-
-	// Silver floor
-	vec3 silver_spec_chroma { 0.8f };
-	float silver_spec_ratio = 0.5;
-	float silver_shininess = 100.0;
-
-	glUniform1i(glGetUniformLocation(g_scene_shader, "uEmissive"), false);
-	glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, (pow(silver_spec_chroma, vec3(2)) * silver_spec_ratio).dataPointer());
-	glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, (silver_spec_chroma * silver_spec_ratio).dataPointer());
-	glUniform1f(glGetUniformLocation(g_scene_shader, "uShininess"), silver_shininess);
-
-	glPushMatrix();
-		glTranslatef(0,-0.01,0);
-		glBegin(GL_TRIANGLES);
-		glNormal3f(0, 1.0, 0);
-		glVertex3f(-40.0, 0, -40.0);
-		glVertex3f( 40.0, 0, -40.0);
-		glVertex3f(-40.0, 0,  40.0);
-		glVertex3f( 40.0, 0, -40.0);
-		glVertex3f( 40.0, 0,  40.0);
-		glVertex3f(-40.0, 0,  40.0);
-		glEnd();
-		glFlush();
-	glPopMatrix();
-
-
-
-
-
-	// Big grey sphere
-	glPushMatrix();
-		vec3 grey(0.8, 0.8, 0.8);
-		glTranslatef(0,0, 4000000);
-		glUniform1i(glGetUniformLocation(g_scene_shader, "uEmissive"), false);
-		glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, grey.dataPointer());
-		glUniform3fv(glGetUniformLocation(g_scene_shader, "uSpecular"), 1, grey.dataPointer());
-		glUniform1f(glGetUniformLocation(g_scene_shader, "uShininess"), 1.0);
-		cgraSphere(1500000, 100, 100);
-	glPopMatrix();
-
-
-
-
-
-
-	//Draw Lights
-	if (g_draw_lights) {
-		for (const Light &l : g_lights) {
-			glPushMatrix();
-				glTranslatef(l.pos_w.x, l.pos_w.y, l.pos_w.z);
-				glUniform1i(glGetUniformLocation(g_scene_shader, "uEmissive"), true);
-				glUniform3fv(glGetUniformLocation(g_scene_shader, "uDiffuse"), 1, normalize(l.flux).dataPointer());
-				cgraSphere(0.1);
-			glPopMatrix();
-		}
-	}
-
-
-	glUseProgram(0);
+    glCallList(g_display_list);
 
 	glDisable(GL_DEPTH_TEST);
 	glDisable(GL_NORMALIZE);
 }
-
-
-
 
 // 
 //
@@ -725,6 +697,7 @@ int main(int argc, char **argv) {
 
 	// Initialize Geometry/Material/Lights
 	initShader();
+    initDisplayList();
 
 	// Loop until the user closes the window
 	while (!glfwWindowShouldClose(g_window)) {
